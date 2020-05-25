@@ -1,7 +1,13 @@
-export default class BooleanProperty {
+import BaseProperty from './base-property';
+
+interface BooleanParams {
+    value?: boolean,
+}
+
+export default class BooleanProperty implements BaseProperty {
     private _value: boolean;
-    constructor(value: boolean){
-        this._value = value;
+    constructor(params: BooleanParams){
+        this._value = params.value || false;
     }
 
     set value(value: boolean){

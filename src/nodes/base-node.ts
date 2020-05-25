@@ -2,18 +2,21 @@ import MidiPlex from '../midiplex';
 import { InputEdgeOptions, OutputEdgeOptions } from '../definitions/node-definition';
 import { InputEdge, OutputEdge, EdgeConnection } from './edges';
 import Quantize from '../config/quantize';
-import NodeProperties from './node-properties';
 import MidiMessage from '../config/midi-message';
 import MessageGenerator from './message-generator';
 import { ClockEventData } from '../clock/clock-sync';
 import EventEmitter from '../util/event-emitter';
 import cloneDeep from 'lodash.clonedeep';
 
+import BaseProperty from './properties/base-property';
+import Properties from './properties/properties';
+
 /**
  * The NodeOptions interface should represent the reconciliation of two other objects
  * implementing NodeDefinition and NodeConfig respectively. This reconciliation is 
  * performed at the graph-level. The NodeOptions object must also importantly contain
  * an id string and a reference to master global MidiPlex object.
+ * 
  */
 interface NodeOptions {
     id: string,
@@ -39,11 +42,11 @@ export default abstract class BaseNode {
     protected midiplex: MidiPlex;
     protected inputEdges: Map<string, InputEdge>;
     protected outputEdges: Map<string, OutputEdge>;
+    protected properties: Map<string, BaseProperty>;
     protected receiveFunction : any;
     protected tickFunction : any;
-    protected properties: NodeProperties;
     protected definitionState: any;
-    protected quantize?: string | false;
+    protected _quantize?: string | false;
 
     constructor(options: NodeOptions) {
         this.id = options.id;
@@ -51,10 +54,10 @@ export default abstract class BaseNode {
         this.midiplex = options.midiplex;
         this.inputEdges = new Map<string, InputEdge>();
         this.outputEdges = new Map<string, OutputEdge>();
-        this.quantize = options.quantize;
+        this._quantize = options.quantize;
 
         //Definition Bindings
-        this.properties = new NodeProperties();
+        this.properties = new Map<string, BaseProperty>();
         this.receiveFunction = options.receive;
         this.tickFunction = options.tick;
         this.definitionState = options.state;
@@ -73,15 +76,12 @@ export default abstract class BaseNode {
         })
 
         /**
-         * Add all our properties
+         * Populate our properties map w/ the properties from the definition file
          */
-        //this.properties.addProperty
-                //TODO: apply properties, etc
-        // Object.defineProperty(this.tickFunction, "quantize", {
-        //     get: () => this.quantize,
-        //     set: (val) => { this._applyQuantize(val); console.log(">>>>>>>>>") }
-        // });
-
+        for (let name in options.properties){
+            let config = options.properties[name];
+            this.properties.set(name, new Properties[config.type](config));
+        }
 
         this.tick = this.tick.bind(this);
         this.receive = this.receive.bind(this);
@@ -153,59 +153,46 @@ export default abstract class BaseNode {
         return this.outputEdges.get(this.id + ":" + edgeName);
     }
 
+    public quantize(value?: string){
+        if (!value) return this._quantize;
+        else this._applyQuantize(value);
+    }
+
+    /**
+     * Get or set a property. This method is exposed to the definition functions as well
+     * as public facing api.
+     */
+    public property(name:string, value?:any){
+        let prop = this.properties.get(name);
+        if (value === undefined) {
+            return prop.value;
+        } else {
+            prop.value = value;
+            this.events.emit("propertyChange", name, value);
+        }
+    }
+
+    /**
+     * Callback function used by midiplex.clock when this node has a quantize value.
+     * 
+     * TODO: Some potential optimizations might include not rebuilding the tick function's
+     * context everytime this function is called and removing the cloneDeep function.
+     * 
+     * @param clockEventData - Clock data as provided by 
+     */
     public tick(clockEventData : ClockEventData){
-
-        let quantize = this.quantize;
-        let applyQuantize = this._applyQuantize.bind(this);
-        let tick = this.tickFunction.bind({
-            state: this.definitionState,
-            generator: MessageGenerator,
-            data: clockEventData,
-            get quantize() { return quantize },
-            set quantize(val) { applyQuantize(val); console.log(">>>>>>>>>"); },
-            send: (message: MidiMessage, outputEdgeName: string) => {
-                /**
-                 * Loop through all the downstream edges associated with the given output edge
-                 * and send the message to each...
-                 */
-                this.outputEdges.get(this.id + ":" + outputEdgeName).toEdges.forEach((edge) => {
-                    /**
-                     * TODO: Assess the performance impact of using cloneDeep here
-                     * and consider an alternate method
-                     */
-                    edge.node.receive(cloneDeep(message), edge.id);
-                })
-            }
-        }); 
-
-        // Object.defineProperty(tick, "quantize", {
-        //     get: () => this.quantize,
-        //     set: (val) => { this._applyQuantize(val); console.log(">>>>>>>>>"); }
-        // });
-
-        //console.log(tick.quantize);
-
-        // // console.log(tick);
-        // tick.call({
-        //     state: this.definitionState,
-        //     generator: MessageGenerator,
-        //     data: clockEventData,
-        //     send: (message: MidiMessage, outputEdgeName: string) => {
-        //         /**
-        //          * Loop through all the downstream edges associated with the given output edge
-        //          * and send the message to each...
-        //          */
-        //         this.outputEdges.get(this.id + ":" + outputEdgeName).toEdges.forEach((edge) => {
-        //             /**
-        //              * TODO: Assess the performance impact of using cloneDeep here
-        //              * and consider an alternate method
-        //              */
-        //             edge.node.receive(cloneDeep(message), edge.id);
-        //         })
-        //     }
-        // })
-
-        tick();
+        try {
+            this.tickFunction.apply({
+                state: this.definitionState,
+                generator: MessageGenerator,
+                data: cloneDeep(clockEventData),
+                quantize: (value: string) => this.quantize(value),
+                prop: (name : string, value : any) => this.property(name, value),
+                send: (message: MidiMessage, outputEdgeName: string) => this._send(message, outputEdgeName)
+            })
+        } catch (err){
+            this.events.emit("error", err);
+        }
     }
 
 
@@ -213,76 +200,22 @@ export default abstract class BaseNode {
      * At the moment messages first arrive at an input edge, which calls its parent's receive() method.
      * The parent has no awareness of which edge the message was received from.
      * 
-     * @param message 
+     * TODO: Assess performance of using cloneDeep here
+     * 
+     * @param message
      * @param receivingEdgeId
      */ 
     public receive(message: MidiMessage, receivingEdgeId: string){
         try {
-            
-            let receive = new this.receiveFunction();
-                //Loop through properties and add getters/setters
-                Object.defineProperty(receive, "quantize", {
-                    get: () => this.quantize,
-                    set: (val) => this._applyQuantize(val) 
-                });
-
-                receive.call({
-                    receivingEdge: receivingEdgeId.split(":")[1],
-                    message: message,
-                    state: this.definitionState,
-                    generator: MessageGenerator,
-                    send: (message: MidiMessage, outputEdgeName: string) => {
-                        /**
-                         * Loop through all the downstream edges associated with the given output edge
-                         * and send the message to each...
-                         */
-                        this.outputEdges.get(this.id + ":" + outputEdgeName).toEdges.forEach((edge) => {
-                            /**
-                             * TODO: Assess the performance impact of using cloneDeep here
-                             * and consider an alternate method
-                             */
-                            edge.node.receive(cloneDeep(message), edge.id);
-                        })
-                    }
-                })
-
-
-            // //Call the receive() function from our NodeDefinition
-            // this.receiveBinding({
-            //     receivingEdge: receivingEdgeId.split(":")[1], //Get just the name portion of the edgeId
-            //     message: message,
-
-            //     generate: (messageType: string) => {
-            //         //TODO: ???
-            //     },
-
-            //     setProperty: (propertyName: string, value: any) => {
-            //         //TODO: How to set properties in this direction??
-            //     },
-
-            //     getProperty: (propertyName: string) => {
-            //         return this.properties.getProperty(propertyName);
-            //     },
-                
-            //     //Fuction which can be used to send 
-            //     send: (message: MidiMessage, outputEdgeName: string) => {
-            //         /**
-            //          * Loop through all the downstream edges associated with the given output edge
-            //          * and send the message to each...
-            //          */
-            //         this.outputEdges.get(this.id + ":" + outputEdgeName).toEdges.forEach((edge) => {
-            //             /**
-            //              * TODO: Assess the performance impact of using cloneDeep here
-            //              * and consider an alternate method
-            //              */
-            //             edge.node.receive(cloneDeep(message), edge.id);
-            //         })
-            //     }
-
-            // });
-
-        } catch (err) {
-            throw err;
+            this.receiveFunction.apply({
+                state: this.definitionState,
+                generator: MessageGenerator,
+                message: message,
+                quantize: (value: string) => this.quantize(value),
+                prop: (name : string, value : any) => this.property(name, value),
+                send: (message: MidiMessage, outputEdgeName: string) => this._send(message, outputEdgeName)
+            })
+        } catch (err){
             this.events.emit("error", err);
         }
     }
@@ -293,39 +226,55 @@ export default abstract class BaseNode {
      * @param value - The qauntize value or false to remove quantize
      */
     private _applyQuantize(value : string | false) {
-
-        console.log("Apply quantize!");
-
         //If a valid quantize value was given
         if (value && Quantize[value] !== undefined){
             //Remove existing listener
-            if (this.quantize){
+            if (this._quantize){
                 this.midiplex.clock.events.removeListener("start", this.tick);
                 this.midiplex.clock.events.removeListener("stop", this.tick);
-                this.midiplex.clock.events.removeListener(this.quantize, this.tick);
+                this.midiplex.clock.events.removeListener(this._quantize, this.tick);
             }
             
-            this.quantize = value;
+            this._quantize = value;
             this.midiplex.clock.events.on("start", this.tick);
             this.midiplex.clock.events.on("stop", this.tick);
-            this.midiplex.clock.events.on(this.quantize, this.tick);
+            this.midiplex.clock.events.on(this._quantize, this.tick);
             return;
         }
 
         //If false was given, just remove our quantize
-        if (!value && this.quantize){
-            this.midiplex.clock.events.removeListener(this.quantize, this.tick); 
+        if (!value && this._quantize){
+            this.midiplex.clock.events.removeListener(this._quantize, this.tick); 
         }
 
-        this.quantize = false;
+        this._quantize = false;
         return;
+    }
+
+    /**
+     * Internal send function which is exposed to this node's defintion
+     * 
+     * @param message 
+     * @param outputEdgeName 
+     */
+    _send(message: MidiMessage, outputEdgeName: string) {
+        /**
+         * Loop through all the downstream edges associated with the given output edge
+         * and send the message to each...
+         */
+        this.outputEdges.get(this.id + ":" + outputEdgeName).toEdges.forEach((edge) => {
+            /**
+             * TODO: Clonedeep was moved to the receive() function. Does this change behavior at all?
+             */
+            edge.node.receive(message, edge.id);
+        })
     }
 
     public activate(){
         /**
-         * Adds our quantize events and initializes this.quantize
+         * Adds our quantize events and initializes this._quantize
          */
-        this._applyQuantize(this.quantize);
+        this._applyQuantize(this._quantize);
     }
 
     public deactivate(){

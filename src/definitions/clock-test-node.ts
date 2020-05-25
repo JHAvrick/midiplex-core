@@ -3,7 +3,27 @@ const CLOCK_TEST_NODE : NodeDefinition = {
     name: "CLOCK_TEST_NODE",
     description: `Test node for the internal clock sync.`,
     baseType: "filter",
-    properties: {},
+    properties: {
+        number: {
+            type: 'number',
+            value: 45,
+            min: 0,
+            max: 100
+        },
+        bool: {
+            type: 'boolean',
+            value: true
+        },
+        list: {
+            type: 'list',
+            items: {
+                type: "number",
+                min: 100,
+                max: 50
+            },
+            value: [1, 2, 3, 4]
+        }
+    },
     state: {
         first: true
     },
@@ -11,12 +31,15 @@ const CLOCK_TEST_NODE : NodeDefinition = {
     outputEdges: [{ name: "out", sends: ["all"] }],
     quantize: "1/16",
     tick: function(){
-        //console.log("Tick!");
+
+        console.log(this.quantize());
+        console.log(this.prop("list"));
 
         if (this.state.first){
-            console.log("FIRST!");
-            console.log(this.quantize);
-            setTimeout(() => {this.quantize = "1/8"; console.log("Triggered!")}, 3000);
+            setTimeout(() => {
+                this.prop("list", [5, 6, 7, 8]);
+                this.quantize("1/8");
+            }, 3000);
             this.state.first = false;
         }
 
