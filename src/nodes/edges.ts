@@ -30,6 +30,41 @@ class InputEdge {
 
         return false;
     }
+
+    /**
+     * Connects this edge to an upstream output edge. Returns false if the edge's are not compatible.
+     * 
+     * @param inputEdge 
+     */
+    from(outputEdge: OutputEdge) : boolean {
+        if (this.isCompatible(outputEdge)){
+            this.fromEdges.set(outputEdge.id, outputEdge);
+            outputEdge.toEdges.set(this.id, this);
+        }
+        console.warn("InputEdge: Attempted to connect an incompatible output edge");
+        return false;
+    }
+
+    public disconnect(outputEdgeId?:string){
+        /**
+         * Remove ALL edges leading to this one
+         */
+        if (!outputEdgeId){
+            this.fromEdges.forEach((upstream) => upstream.toEdges.delete(this.id));
+            this.fromEdges.clear();
+            return;
+        }
+
+        /**
+         * Or remove a single edge if an id was provided
+         */
+        if (this.fromEdges.has(outputEdgeId)){
+            let upstream = this.fromEdges.get(outputEdgeId);
+                upstream.toEdges.delete(this.id);
+            this.fromEdges.delete(outputEdgeId);
+        }
+    }
+
 }
 
 class OutputEdge {
@@ -47,6 +82,12 @@ class OutputEdge {
         this.toEdges = new Map<string, InputEdge>();
     }
 
+    /**
+     * Checks whether this edge shares and send types with the given input
+     * edge's receiving types (midi message types)
+     * 
+     * @param inputEdge {InputEdge}
+     */
     public isCompatible(inputEdge: InputEdge) {
         switch (true) {
             case inputEdge.receiveTypes.length === 0: return false;
@@ -61,126 +102,46 @@ class OutputEdge {
         
         return false;
     }
+
+    /**
+     * Connects this edge to a downstream input edge. Returns false if the edge's are not compatible.
+     * 
+     * @param inputEdge 
+     */
+    to(inputEdge: InputEdge) : boolean {
+        if (this.isCompatible(inputEdge)){
+            this.toEdges.set(inputEdge.id, inputEdge);
+            inputEdge.fromEdges.set(this.id, this);
+        }
+        console.warn("OutputEdge: Attempted to connect an incompatible input edge");
+        return false;
+    }
+
+    /**
+     * Remove a destination/downstream edge from this edge's collection. Also
+     * removes this edge from the destination node's input collection. Calling
+     * this method with no arguments will disconnect ALL downstream edges.
+     * 
+     * @params {string} inputEdgeId - An edge id, which is a string containing both the 
+     * parent node's id and the edge name, i.e. <nodeId>:<edgeName>
+     * 
+     */
+    public disconnect(inputEdgeId?:string){
+        /**
+         * Remove ALL edges downstream from this one
+         */
+        if (!inputEdgeId){
+            this.toEdges.forEach((downstream) => downstream.fromEdges.delete(this.id));
+            this.toEdges.clear();
+            return;
+        }
+
+        if (this.toEdges.has(inputEdgeId)){
+            let downstream = this.toEdges.get(inputEdgeId);
+                downstream.fromEdges.delete(this.id);
+            this.toEdges.delete(inputEdgeId);
+        }
+    }
 }
 
-class EdgeConnection {
-    public input: InputEdge;
-    public output: OutputEdge;
-    private _connected: boolean;
-    constructor(output: OutputEdge, input: InputEdge){
-        this.output = output;
-        this.input = input;
-        this._connected = true;
-        output.toEdges.set(input.id, input); 
-        input.fromEdges.set(output.id, output); 
-    }
-
-    get connected(): boolean{
-        return this._connected;
-    }
-
-    public disconnect(){
-        this.output.toEdges.delete(this.input.id);
-        this.input.fromEdges.delete(this.output.id);
-        this._connected = false;
-    }
-}
-
-
-
-
-// class OutputEdge {
-
-//     public key: string;
-//     public sendTypes: Array<string>;
-//     public outputs: Map<string, InputEdge>;
-
-//     constructor(parentNode: BaseNode, key:string, sendTypes:Array<string>){
-//         this.key = key;
-//         this.sendTypes = sendTypes;
-//         this.outputs = new Map<string, InputEdge>();
-//     }
-
-//     /**
-//      * Sends a message to all of this edge's outputs
-//      * 
-//      * @param message - A midi message object
-//      */
-//     send(message: MidiMessage){
-//         this.outputs.forEach((inputEdge) => {
-//             inputEdge.receive(message);
-//         });
-//     }
-
-//     to(input: InputEdge): boolean {
-//         /**
-//          * TODO: Validate connection and return false if the connection is illegal
-//          *  - Cannot go to own edges
-//          *  - Cannot form loop (traverse tree and make sure no downstream edge connects to one of this edge's inputs)
-//          *  - Log a console warning if a closed loop is attempted
-//          */
-//         this.outputs.set(input.key, input);
-//         input.inputs.set(this.key, this); //Add 
-//         return true;
-//     }
-
-//     disconnect(key: string): boolean {
-//         return this.outputs.delete(key);
-//     }
-    
-// }
-
-
-
-// class InputEdge {
-
-//     private parentNode: BaseNode;
-//     public key: string;
-//     public receiveTypes: Array<string>;
-//     public inputs: Map<string, OutputEdge>;
-
-//     constructor(parentNode: BaseNode, key:string, receiveTypes:Array<string>){
-//         this.key = key;
-//         this.receiveTypes = receiveTypes;
-//         this.inputs = new Map<string, OutputEdge>();
-//     }
-
-//     /**
-//      * This function adds an edge to this edge's inputs map WITHOUT adding itself to the
-//      * given edge's own map. In other words, this function establishes a ONE-WAY connection
-//      * between two nodes.
-//      */
-//     addEdgeToInputs(output: OutputEdge){
-//         this.inputs.set(output.key, output);
-//     }
-
-//     from(output: OutputEdge): boolean {
-//         /**
-//          * TODO: Validate connection and return false if the connection is illegal
-//          *  - Cannot go to own edges
-//          *  - Cannot form loop (traverse tree and make sure no downstream edge connects to one of this edge's inputs)
-//          *  - Log a console warning if a closed loop is attempted
-//          */
-//         this.outputs.set(input.key, input);
-//         return true;
-//     }
-
-//     receive(message: MidiMessage){
-//         //TODO: Check first if the message is of the correct type
-//         this.parentNode.receive(message);
-//     }
-
-//     disconnect(key: string): boolean {
-//         return this.inputs.delete(key);
-//     }
-
-// }
-
-
-// interface IEdge {
-//     id: string,
-//     outputEdges: Array<{}>,
-//     receiveTypes: []
-// }
-
-export { OutputEdge, InputEdge, EdgeConnection };
+export { OutputEdge, InputEdge };

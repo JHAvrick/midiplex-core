@@ -19,6 +19,7 @@ const LATCH_NOTE_NODE : NodeDefinition = {
         { name: "latch", sends: ["noteon", "noteoff"] },
         { name: "thru", sends: ["all"] }
     ],
+    quantize: null,
     tick: function(){},
     receive: function(params: ReceiveParams){
         /**

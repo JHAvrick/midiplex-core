@@ -1,7 +1,7 @@
 import MidiPlex from '../midiplex';
 import NodeDefinition from '../definitions/node-definition';
 import BaseNode, { NodeOptions } from '../nodes/base-node';
-import { InputEdge, OutputEdge, EdgeConnection } from '../nodes/edges';
+import { InputEdge, OutputEdge } from '../nodes/edges';
 import Nodes from '../nodes/nodes';
 import shortid from 'shortid';
 import NodeConfig from '../config/node-config';
@@ -73,51 +73,51 @@ class MidiPlexGraph {
         this.events.emit("nodeRemoved", nodeId);
     }
 
-    /**
-     * Edges can be connected either by providing the actual edge instance or the node/edge keys
-     * 
-     * @param from - The sending edge
-     * @param to - The receiving edge
-     */
-    public connectEdges(from: OutputEdge, to: InputEdge) : EdgeConnection | false;
-    public connectEdges(from: {nodeId: string, edgeId: string}, to: {nodeId: string, edgeId: string}) : EdgeConnection | false;
-    public connectEdges(from: any, to:any) : EdgeConnection | false {
-        let fromEdge = from instanceof OutputEdge ? from : this.getOutputEdge(from.nodeId, from.edgeId);
-        let toEdge = to instanceof InputEdge ?  to : this.getInputEdge(to.nodeId, to.edgeId);
-        if (!fromEdge || !toEdge) return false;
+    // /**
+    //  * Edges can be connected either by providing the actual edge instance or the node/edge keys
+    //  * 
+    //  * @param from - The sending edge
+    //  * @param to - The receiving edge
+    //  */
+    // public connectEdges(from: OutputEdge, to: InputEdge) : EdgeConnection | false;
+    // public connectEdges(from: {nodeId: string, edgeId: string}, to: {nodeId: string, edgeId: string}) : EdgeConnection | false;
+    // public connectEdges(from: any, to:any) : EdgeConnection | false {
+    //     let fromEdge = from instanceof OutputEdge ? from : this.getOutputEdge(from.nodeId, from.edgeId);
+    //     let toEdge = to instanceof InputEdge ?  to : this.getInputEdge(to.nodeId, to.edgeId);
+    //     if (!fromEdge || !toEdge) return false;
 
-        return fromEdge.node.to(fromEdge.id, toEdge);
-    }
+    //     return fromEdge.node.to(fromEdge.id, toEdge);
+    // }
 
-    /**
-     * Edges can be connected either by providing the actual edge instance or the node/edge keys
-     * 
-     * @param from - The sending edge
-     * @param to - The receiving edge
-     */
-    public disconnectEdges(from: OutputEdge, to: InputEdge) : boolean;
-    public disconnectEdges(from: {nodeId: string, edgeId: string}, to: {nodeId: string, edgeId: string}) : boolean;
-    public disconnectEdges(from: any, to: any) : boolean {
-        let fromEdge = from instanceof OutputEdge ? from : this.getOutputEdge(from.nodeId, from.edgeId);
-        let toEdge = to instanceof InputEdge ?  to : this.getInputEdge(to.nodeId, to.edgeId);
-        if (!fromEdge || !toEdge) return false;
+    // /**
+    //  * Edges can be connected either by providing the actual edge instance or the node/edge keys
+    //  * 
+    //  * @param from - The sending edge
+    //  * @param to - The receiving edge
+    //  */
+    // public disconnectEdges(from: OutputEdge, to: InputEdge) : boolean;
+    // public disconnectEdges(from: {nodeId: string, edgeId: string}, to: {nodeId: string, edgeId: string}) : boolean;
+    // public disconnectEdges(from: any, to: any) : boolean {
+    //     let fromEdge = from instanceof OutputEdge ? from : this.getOutputEdge(from.nodeId, from.edgeId);
+    //     let toEdge = to instanceof InputEdge ?  to : this.getInputEdge(to.nodeId, to.edgeId);
+    //     if (!fromEdge || !toEdge) return false;
 
 
 
-        //return fromEdge.node.to(fromEdge.id, toEdge);
-    }
+    //     //return fromEdge.node.to(fromEdge.id, toEdge);
+    // }
 
-    public getInputEdge(nodeId : string, edgeId : string) : false | InputEdge {
-        let node = this.nodes.get(nodeId);
-        if (!node) return false;
-        return node.getInputEdge(edgeId);
-    }
+    // public getInputEdge(nodeId : string, edgeId : string) : false | InputEdge {
+    //     let node = this.nodes.get(nodeId);
+    //     if (!node) return false;
+    //     return node.getInputEdge(edgeId);
+    // }
 
-    public getOutputEdge(nodeId : string, edgeId : string) : false | OutputEdge {
-        let node = this.nodes.get(nodeId);
-        if (!node) return false;
-        return node.getOutputEdge(edgeId);
-    }
+    // public getOutputEdge(nodeId : string, edgeId : string) : false | OutputEdge {
+    //     let node = this.nodes.get(nodeId);
+    //     if (!node) return false;
+    //     return node.getOutputEdge(edgeId);
+    // }
 
     public activate(){
         this.nodes.forEach((node) => node.activate());

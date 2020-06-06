@@ -1,13 +1,12 @@
 import MidiPlex from '../midiplex';
 import { InputEdgeOptions, OutputEdgeOptions } from '../definitions/node-definition';
-import { InputEdge, OutputEdge, EdgeConnection } from './edges';
+import { InputEdge, OutputEdge } from './edges';
 import Quantize from '../config/quantize';
 import MidiMessage from '../config/midi-message';
 import MessageGenerator from './message-generator';
 import { ClockEventData } from '../clock/clock-sync';
 import EventEmitter from '../util/event-emitter';
 import cloneDeep from 'lodash.clonedeep';
-
 import BaseProperty from './properties/base-property';
 import Properties from './properties/properties';
 
@@ -65,15 +64,8 @@ export default abstract class BaseNode {
         /**
          * Populate our input and output edges based on the given config
          */
-        options.inputEdges.forEach((inputEdgeConfig) => {
-            let input = new InputEdge(this, inputEdgeConfig.name, inputEdgeConfig.receives);
-            this.inputEdges.set(input.id, input)
-        })
-
-        options.outputEdges.forEach((outputEdgeConfig) => {
-            let output = new OutputEdge(this, outputEdgeConfig.name, outputEdgeConfig.sends);
-            this.outputEdges.set(output.id, output)
-        })
+        options.inputEdges.forEach((options) => this.addInputEdge(options.name, options.receives));
+        options.outputEdges.forEach((options) => this.addOutputEdge(options.name, options.sends));
 
         /**
          * Populate our properties map w/ the properties from the definition file
@@ -83,46 +75,89 @@ export default abstract class BaseNode {
             this.properties.set(name, new Properties[config.type](config));
         }
 
+        /**
+         * Make sure our tick function is always called in context
+         */
         this.tick = this.tick.bind(this);
-        this.receive = this.receive.bind(this);
     }
 
     /**
+     * Returns an output edge with the  given name
      * 
-     * @param fromEdgeId - The id of this node's edge to connect
-     * @param toEdge - An edge
+     * @param name {string}
      */
-    public to(fromEdgeName: string, toEdge: InputEdge) : EdgeConnection | false {
-        /**
-         * Validate our connection
-         */
-        let outputEdge = this.outputEdges.get(this.id + ":" + fromEdgeName);
-
-        switch (true){
-            case toEdge.node === this: //Nodes cannot send to their own edges
-            case !outputEdge: return false; //The edge doesn't exist on this node
-           // case !toEdge.isCompatible(outputEdge): return false; //Edges must have at least one send/receive type in common
-            //TODO - IMPORTANT: Add case to check whether a closed loop is formed
-        }
-
-        outputEdge.toEdges.set(toEdge.id, toEdge); //Give this node's edge a downstream receiving edge
-        toEdge.fromEdges.set(outputEdge.id, outputEdge); //Give the other node's edge an upstream sending edge
-
-        return new EdgeConnection(outputEdge, toEdge);
+    public out(name) : OutputEdge {
+        return this.outputEdges.get(name);
     }
 
-    public disconnect(fromEdgeId: string, toEdge: InputEdge){
-        /**
-         * Validate our connection
-         */
-        let outputEdge = this.outputEdges.get(fromEdgeId);
-        if (!outputEdge) return false;
+    /**
+     * Returns an input edge with the given name
+     * 
+     * @param name {string}
+     */
+    public in(name) : InputEdge {
+        return this.inputEdges.get(name);
+    }
 
-        outputEdge.toEdges.delete(toEdge.id);
-        toEdge.fromEdges.delete(outputEdge.id);
 
-        return true;
-        //return new EdgeConnection(outputEdge, toEdge);
+    /**
+     * Add a new output edge to this node
+     * 
+     * @param outputEdgeConfig 
+     */
+    public addOutputEdge(name : string, sends: Array<string> ) : OutputEdge {
+        if (!this.outputEdges.has(name)){
+            let outputEdge = new OutputEdge(this, name, sends);
+            this.outputEdges.set(name, outputEdge);
+            this.events.emit("outputEdgeAdded", outputEdge);
+            return outputEdge;
+        }
+
+        console.warn("BaseNode: An output edge with the given name already exists");
+        return;
+    }
+
+    /**
+     * Create a new input edge on this node
+     * 
+     * @param outputEdgeConfig 
+     */
+    public addInputEdge(name : string, receives: Array<string> ) : InputEdge {
+        if (!this.inputEdges.has(name)){
+            let inputEdge = new InputEdge(this, name, receives);
+            this.inputEdges.set(name, inputEdge);
+            this.events.emit("inputEdgeAdded", inputEdge);
+            return inputEdge;
+        }
+
+        console.warn("BaseNode: An input edge with the given name already exists");
+        return;
+    }
+
+    /**
+     * Completely removes one of this node's edges, disconnecting any 
+     * 
+     * @param name - name of the edge
+     */
+    public removeInputEdge(name:string){
+        if (this.inputEdges.has(name)){
+            this.inputEdges.get(name).disconnect();
+            this.inputEdges.delete(name);
+            this.events.emit("inputEdgeRemoved", name);
+        }
+    }
+
+    /**
+     * Completely removes one of this node's edges, disconnecting any 
+     * 
+     * @param name - name of the edge
+     */
+    public removeOutputEdge(name:string){
+        if (this.outputEdges.has(name)){
+            this.outputEdges.get(name).disconnect();
+            this.outputEdges.delete(name);
+            this.events.emit("outputEdgeRemoved", name);
+        }
     }
 
     /**
@@ -136,23 +171,10 @@ export default abstract class BaseNode {
     }
 
     /**
-     * Returns the input edge with the given ID if it exists, otherwise returns false
+     * Get or set the quantize value
      * 
-     * @param edgeId
+     * @param value {string} 
      */
-    public getInputEdge(edgeName: string) : false | InputEdge {
-        return this.inputEdges.get(this.id + ":" + edgeName);
-    }
-
-    /**
-     *  Returns the output edge with the given ID if it exists, otherwise returns false
-     * 
-     * @param edgeId
-     */
-    public getOutputEdge(edgeName: string) : false | OutputEdge {
-        return this.outputEdges.get(this.id + ":" + edgeName);
-    }
-
     public quantize(value?: string){
         if (!value) return this._quantize;
         else this._applyQuantize(value);
@@ -186,31 +208,6 @@ export default abstract class BaseNode {
                 state: this.definitionState,
                 generator: MessageGenerator,
                 data: cloneDeep(clockEventData),
-                quantize: (value: string) => this.quantize(value),
-                prop: (name : string, value : any) => this.property(name, value),
-                send: (message: MidiMessage, outputEdgeName: string) => this._send(message, outputEdgeName)
-            })
-        } catch (err){
-            this.events.emit("error", err);
-        }
-    }
-
-
-    /**
-     * At the moment messages first arrive at an input edge, which calls its parent's receive() method.
-     * The parent has no awareness of which edge the message was received from.
-     * 
-     * TODO: Assess performance of using cloneDeep here
-     * 
-     * @param message
-     * @param receivingEdgeId
-     */ 
-    public receive(message: MidiMessage, receivingEdgeId: string){
-        try {
-            this.receiveFunction.apply({
-                state: this.definitionState,
-                generator: MessageGenerator,
-                message: message,
                 quantize: (value: string) => this.quantize(value),
                 prop: (name : string, value : any) => this.property(name, value),
                 send: (message: MidiMessage, outputEdgeName: string) => this._send(message, outputEdgeName)
@@ -257,17 +254,42 @@ export default abstract class BaseNode {
      * @param message 
      * @param outputEdgeName 
      */
-    _send(message: MidiMessage, outputEdgeName: string) {
+    private _send(message: MidiMessage, outputEdgeName: string) {
         /**
          * Loop through all the downstream edges associated with the given output edge
          * and send the message to each...
          */
-        this.outputEdges.get(this.id + ":" + outputEdgeName).toEdges.forEach((edge) => {
+        this.outputEdges.get(outputEdgeName).toEdges.forEach((edge) => {
             /**
              * TODO: Clonedeep was moved to the receive() function. Does this change behavior at all?
              */
-            edge.node.receive(message, edge.id);
+            edge.node.receive(message, edge.name);
         })
+    }
+
+    /**
+     * At the moment messages first arrive at an input edge, which calls its parent's receive() method.
+     * The parent has no awareness of which edge the message was received from.
+     * 
+     * TODO: Assess performance of using cloneDeep here
+     * 
+     * @param message
+     * @param receivingEdgeId
+     */ 
+    public receive(message: MidiMessage, receivingEdgeName: string){
+        try {
+            this.receiveFunction.apply({
+                state: this.definitionState,
+                receivingEdge: receivingEdgeName,
+                generator: MessageGenerator,
+                message: message,
+                quantize: (value: string) => this.quantize(value),
+                prop: (name : string, value : any) => this.property(name, value),
+                send: (message: MidiMessage, outputEdgeName: string) => this._send(message, outputEdgeName)
+            })
+        } catch (err){
+            this.events.emit("error", err);
+        }
     }
 
     public activate(){
