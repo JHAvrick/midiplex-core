@@ -37,9 +37,16 @@ class InputEdge {
      * @param inputEdge 
      */
     from(outputEdge: OutputEdge) : boolean {
+        if (this.node.hasDownstreamNode(outputEdge.node)){
+            console.warn("OutputEdge: Attempted to connect an edge which would have created a closed loop/cycle");
+            return false;
+        }
+
+
         if (this.isCompatible(outputEdge)){
             this.fromEdges.set(outputEdge.id, outputEdge);
             outputEdge.toEdges.set(this.id, this);
+            return true;
         }
         console.warn("InputEdge: Attempted to connect an incompatible output edge");
         return false;
@@ -90,8 +97,9 @@ class OutputEdge {
      */
     public isCompatible(inputEdge: InputEdge) {
         switch (true) {
-            case inputEdge.receiveTypes.length === 0: return false;
+            case this.sendTypes.includes("all"): return true;
             case this.sendTypes.length === 0: return false;
+            case inputEdge.receiveTypes.length === 0: return false;
             case inputEdge.receiveTypes.includes("all"): return true;
         }
 
@@ -104,14 +112,21 @@ class OutputEdge {
     }
 
     /**
-     * Connects this edge to a downstream input edge. Returns false if the edge's are not compatible.
+     * Connects this edge to a downstream input edge. Returns false if the edge's are not compatible and
+     * returns the destination edge's parent node if the connection is valid (this allows for chaining)
      * 
      * @param inputEdge 
      */
-    to(inputEdge: InputEdge) : boolean {
+    to(inputEdge: InputEdge) : BaseNode | boolean {
+        if (inputEdge.node.hasDownstreamNode(this.node)) {
+            console.warn("OutputEdge: Attempted to connect an edge which would have created a closed loop/cycle");
+            return false;
+        }
+
         if (this.isCompatible(inputEdge)){
             this.toEdges.set(inputEdge.id, inputEdge);
             inputEdge.fromEdges.set(this.id, this);
+            return inputEdge.node;
         }
         console.warn("OutputEdge: Attempted to connect an incompatible input edge");
         return false;

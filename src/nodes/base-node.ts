@@ -161,6 +161,33 @@ export default abstract class BaseNode {
     }
 
     /**
+     * Checks whether this node has another node anywhere downstream. Used to 
+     * check whether a connection will cause a closed loop.
+     * 
+     * TODO: There is probably a more traditional and optimized way to perform this check. 
+     * See https://www.geeksforgeeks.org/detect-cycle-undirected-graph/
+     * 
+     * @param node - a potential downstream node
+     */
+    public hasDownstreamNode(node: BaseNode){
+        if (node === this) return true;
+
+        let outputEdges = Array.from(this.outputEdges.values());
+        for (let i = 0; i < outputEdges.length; i++){
+
+            let toEdges = Array.from(outputEdges[i].toEdges.values());
+            for (let x = 0; x < toEdges.length; x++){
+                if (toEdges[i].node === node) return true;
+                if (toEdges[i].node.hasDownstreamNode(node)) return true;
+            }
+
+        }
+
+        return false;
+
+    }
+
+    /**
      * Shorthand wrapper function for this.events.on()
      * 
      * @param event 
@@ -249,7 +276,8 @@ export default abstract class BaseNode {
     }
 
     /**
-     * Internal send function which is exposed to this node's defintion
+     * Internal send function which is exposed to this node's defintion. If the definition attempts to 
+     * send to an edge that doesn't exist, thing will happen.
      * 
      * @param message 
      * @param outputEdgeName 
@@ -259,7 +287,7 @@ export default abstract class BaseNode {
          * Loop through all the downstream edges associated with the given output edge
          * and send the message to each...
          */
-        this.outputEdges.get(outputEdgeName).toEdges.forEach((edge) => {
+        this.outputEdges.get(outputEdgeName)?.toEdges.forEach((edge) => {
             /**
              * TODO: Clonedeep was moved to the receive() function. Does this change behavior at all?
              */
@@ -283,9 +311,11 @@ export default abstract class BaseNode {
                 receivingEdge: receivingEdgeName,
                 generator: MessageGenerator,
                 message: message,
+                inputEdges: Array.from(this.inputEdges.entries()).map((entry) => { return { name: entry[0], receives: entry[1].receiveTypes }}),
+                outputEdges: Array.from(this.outputEdges.entries()).map((entry) => { return { name: entry[0], receives: entry[1].sendTypes }}),
                 quantize: (value: string) => this.quantize(value),
                 prop: (name : string, value : any) => this.property(name, value),
-                send: (message: MidiMessage, outputEdgeName: string) => this._send(message, outputEdgeName)
+                send: (message: MidiMessage, outputEdgeName: string) => this._send(message, outputEdgeName),
             })
         } catch (err){
             this.events.emit("error", err);

@@ -19,16 +19,35 @@ navigator.requestMIDIAccess().then(function(){
             }   
         });
 
+        console.log(MidiPlex.Nodes);
 
         let graph = mp.graphs.addGraph("scene");
         let inputNode = graph.addNode(MidiPlex.Nodes.INPUT_DEVICE_NODE);
         let outputNode = graph.addNode(MidiPlex.Nodes.OUTPUT_DEVICE_NODE);
             outputNode.setDeviceId("monologue");
-        let clockNode = graph.addNode(MidiPlex.Nodes.CLOCK_TEST_NODE);
-        
-        console.log(clockNode);
 
-        clockNode.to("out", outputNode.getInputEdge("in"));
+        let debugNode = graph.addNode(MidiPlex.Nodes.DEBUG_NODE);
+        let clockNode = graph.addNode(MidiPlex.Nodes.CLOCK_TEST_NODE);
+        let routeNode = graph.addNode(MidiPlex.Nodes.ROUTE_MESSAGE_TYPE_NODE);
+            routeNode.addOutputEdge("noteon", ["noteon"]);
+        
+        // clockNode  
+        // .out("out").to(routeNode.in("in")) //ClockNode:out --> RouteNode:in
+        // .out("noteon").to(debugNode.in("in")); //RouteNode:noteon --> DebugNode:in
+
+        //debugNode.out("thru").to(clockNode.in("in"));
+
+        //clockNode.hasDownstreamNode(debugNode);
+
+        debugNode.out("thru").to(clockNode.in("in"));
+
+        debugNode.in("in").from(clockNode.out("out"));
+
+        //clockNode.out("out").to(debugNode.in("in"));
+
+        //console.log(clockNode.hasDownstreamNode(debugNode))
+
+        //clockNode.to("out", outputNode.getInputEdge("in"));
 
         graph.activate();
 

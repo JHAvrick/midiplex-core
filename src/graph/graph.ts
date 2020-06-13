@@ -37,6 +37,12 @@ class MidiPlexGraph {
             return
         }  
 
+        if (!definition){
+            console.warn("Graph: Cannot create node as no definition was provided");
+            return;
+        }
+
+
         //Get our node class
         let NodeClass = Nodes[definition.baseType];
         if (!NodeClass) return false;

@@ -6,7 +6,7 @@ interface ListParams {
     items?: {
         type: string,
         [prop: string]: any;
-     }
+    }
 }
 
 export default class ListProperty implements BaseProperty {
@@ -32,7 +32,7 @@ export default class ListProperty implements BaseProperty {
              */
             this._value = params.value.map((propValues) => {
                 return new Properties[this._itemTypeConfig.type](
-                    Object.assign({}, params.items, { value: propValues})
+                    Object.assign({}, params.items, { value: propValues })
                 );
             })
         }
@@ -45,7 +45,7 @@ export default class ListProperty implements BaseProperty {
     set value(value: Array<any>) {
         this._value = value.map((propValues) => {
             return new Properties[this._itemTypeConfig.type](
-                Object.assign({}, this._itemTypeConfig, { value: propValues})
+                Object.assign({}, this._itemTypeConfig, { value: propValues })
             );
         })
     }
