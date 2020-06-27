@@ -1,3 +1,6 @@
+/**
+ * TODO: What is this used for???
+ */
 export default interface NodeConfig {
     id?: string, //Use a specific ID for this node, necessary when creating nodes based on a previous serialization
     name?: string, //Use a specific name for this node

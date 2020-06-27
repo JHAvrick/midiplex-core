@@ -1,7 +1,7 @@
 import EventEmitter from "../util/event-emitter";
 import { DeviceOptions, DeviceEvent, DeviceStatus } from './device-model';
 import MidiDevice from './midi-device';
-import MidiMessage from "../config/midi-message";
+import { MidiMessage } from '../config/midi-messages';
 
 export default class DeviceManager {
 

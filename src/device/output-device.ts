@@ -1,5 +1,7 @@
 import { DeviceStatus } from './device-model';
-import MidiMessage from '../config/midi-message';
+import { MidiMessage } from '../config/midi-messages';
+import * as MidiMessages from '../config/midi-messages';
+
 
 class OutputDevice {
 
@@ -64,18 +66,18 @@ class OutputDevice {
  * the given portInstance object (a WebMidiJS output)
  */
 OutputDevice.messageBroker = {
-    noteon: function(portInstance: any, message: MidiMessage, options: { [key: string]: any }){
-        portInstance.playNote(message.note.number, message.channel, options);
-    },
-    noteoff: function(portInstance: any, message: MidiMessage, options: { [key: string]: any }){
+    noteoff: function(portInstance: any, message: MidiMessages.NoteOff, options: { [key: string]: any }){
         portInstance.stopNote(message.note.number, message.channel, options);
     },
-    controlchange: function(portInstance: any, message: MidiMessage, options: { [key: string]: any }){
+    noteon: function(portInstance: any, message: MidiMessages.NoteOn, options: { [key: string]: any }){
+        portInstance.playNote(message.note.number, message.channel, options);
+    },
+    controlchange: function(portInstance: any, message: MidiMessages.ControlChange, options: { [key: string]: any }){
         //console.log(message, options);
         portInstance.sendControlChange(message.controller.number, message.value, message.channel, options);
     },
 
-    sysex: function(portInstance: any, message: MidiMessage, options: { [key: string]: any }){
+    sysex: function(portInstance: any, message: MidiMessages.Sysex, options: { [key: string]: any }){
         console.log("TODO: Handle outgoing messages w/ type=sysex")
     },
     /**
@@ -88,11 +90,11 @@ OutputDevice.messageBroker = {
      * to accommodate a niche use case.
      * 
      */
-    raw: function(portInstance: any, message: MidiMessage, options: { [key: string]: any }){
-        let statusByte = message.data.shift();
-        let data = message.data;
-        portInstance.send(statusByte, data);
-    }
+    // raw: function(portInstance: any, message: MidiMessage, options: { [key: string]: any }){
+    //     let statusByte = message.data.shift();
+    //     let data = message.data;
+    //     portInstance.send(statusByte, data);
+    // }
 }
 
 export default OutputDevice;

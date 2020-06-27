@@ -7,6 +7,7 @@ const BLANK_NODE : NodeDefinition = {
     baseType: "input",
     properties: {},
     state: {},
+    quantize: false,
     inputEdges: [
         { name: "in", receives: ["all"] }
     ],

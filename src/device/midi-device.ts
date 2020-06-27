@@ -2,7 +2,7 @@ import { DeviceOptions, DeviceEvent, DeviceStatus } from './device-model';
 import InputDevice from './input-device';
 import OutputDevice from './output-device';
 import EventEmitter from '../util/event-emitter';
-import MidiMessage from '../config/midi-message';
+import { MidiMessage } from '../config/midi-messages';
 
 class MidiDevice {
 

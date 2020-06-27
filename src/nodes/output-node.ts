@@ -1,6 +1,6 @@
 import BaseNode, { NodeOptions } from "./base-node";
 import MidiPlex from "../midiplex";
-import MidiMessage from "../config/midi-message";
+import { MidiMessage } from '../config/midi-messages';
 
 export default class OutputNode extends BaseNode {
 

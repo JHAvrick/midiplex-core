@@ -1,6 +1,6 @@
 import BaseNode, { NodeOptions } from "./base-node";
 import InputEventTypes from '../config/input-event-types';
-import MidiMessage from "../config/midi-message";
+import { MidiMessage } from '../config/midi-messages';
 import cloneDeep from 'lodash.clonedeep';
 
 export default class InputNode extends BaseNode {

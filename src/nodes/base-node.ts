@@ -2,13 +2,13 @@ import MidiPlex from '../midiplex';
 import { InputEdgeOptions, OutputEdgeOptions } from '../definitions/node-definition';
 import { InputEdge, OutputEdge } from './edges';
 import Quantize from '../config/quantize';
-import MidiMessage from '../config/midi-message';
 import MessageGenerator from './message-generator';
 import { ClockEventData } from '../clock/clock-sync';
 import EventEmitter from '../util/event-emitter';
 import cloneDeep from 'lodash.clonedeep';
 import BaseProperty from './properties/base-property';
 import Properties from './properties/properties';
+import { MidiMessage } from '../config/midi-messages';
 
 /**
  * The NodeOptions interface should represent the reconciliation of two other objects
